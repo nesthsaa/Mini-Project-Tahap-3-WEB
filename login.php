@@ -10,12 +10,12 @@ if(isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true){
         } elseif ($_SESSION["level"] === 'customer') {
             header("location: halamancustomer.php");
             exit;
-        }
+        } 
     }
 }
 
 // Periksa apakah pengguna telah mengirimkan formulir login
-if($_SERVER["REQUEST_METHOD"] == "POST"){
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Koneksi ke database
     $host = "localhost"; // Ganti dengan host Anda
     $username = "root"; // Ganti dengan username database Anda
@@ -32,6 +32,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
     // Ambil data dari form login
     $username = $_POST['username'];
     $password = $_POST['password'];
+    $level = $_POST['level']; // Perbaikan: Ambil nilai peran dari dropdown
     
     // Query untuk mencari pengguna dengan username dan password yang cocok
     $query = "SELECT * FROM user WHERE username='$username' AND password='$password'";
@@ -44,19 +45,16 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
         // Set session pengguna
         $_SESSION["loggedin"] = true;
         $_SESSION["username"] = $username;
-        // Periksa apakah kolom 'level' ada dalam hasil query
-        if(isset($user['level'])) {
-            $_SESSION["level"] = $user['level'];
-            // Redirect user ke halaman sesuai perannya
-            if ($user['level'] == 'admin') {
-                header("Location: index.php");
-            } elseif ($user['level'] == 'customer') {
-                header("Location: halamancustomer.php");
-            }
-        } else {
-            // Jika kolom 'level' tidak ada, tampilkan pesan kesalahan
-            $error = "Peran tidak valid.";
-        }
+        $_SESSION["level"] = $level; // Perbaikan: Simpan nilai peran dalam $_SESSION
+        
+        // Redirect user ke halaman sesuai perannya
+        if ($level == 'admin') {
+            header("Location: index.php");
+            exit;
+        } elseif ($level == 'customer') {
+            header("Location: halamancustomer.php");
+            exit;
+        } 
     } else {
         // Jika tidak ditemukan, tampilkan pesan kesalahan
         $error = "Username atau password salah.";
@@ -64,6 +62,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
     // Tutup koneksi ke database
     mysqli_close($conn);
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="en">

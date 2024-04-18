@@ -18,6 +18,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = $_POST['username'];
     $email = $_POST['email']; // Alamat email pengguna
     $password = $_POST['password'];
+    $level = 'customer';
     
     // Query untuk memasukkan pengguna baru ke dalam database
     $query = "INSERT INTO user (username, email, password, level) VALUES ('$username', '$email', '$password', '$level')";

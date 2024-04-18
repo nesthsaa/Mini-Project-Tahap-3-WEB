@@ -9,6 +9,102 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true || $_SESSION
     header("location: login.php");
     exit;
 }
+
+// Fungsi untuk menambahkan pelanggan baru
+if (isset($_POST['submit'])) {
+    // Ambil data yang dikirimkan dari form
+    $username = $_POST['username'];
+    $email = $_POST['email'];
+    $password = $_POST['password']; // Ambil password dari form
+
+    // Query untuk menambahkan pelanggan baru
+    $sql_add_customer = "INSERT INTO user (username, email, password, level) VALUES ('$username', '$email', '$password', 'customer')";
+
+    // Eksekusi query
+    if (mysqli_query($conn, $sql_add_customer)) {
+        echo "<script>alert('Customer added successfully!');</script>";
+    } else {
+        echo "Error: " . $sql_add_customer . "<br>" . mysqli_error($conn);
+    }
+}
+
+
+
+// Fungsi untuk mengubah status janji temu dalam basis data
+function updateAppointmentStatus($appointment_id, $status) {
+    global $conn; // Gunakan koneksi ke basis data yang sudah dibuat sebelumnya
+    $sql = "UPDATE appointments SET status='$status' WHERE id='$appointment_id'";
+
+    if ($conn->query($sql) === TRUE) {
+        // Tampilkan pemberitahuan dengan skrip JavaScript jika pembaruan berhasil
+        echo "<script>alert('Appointment status updated successfully');</script>";
+    } else {
+        // Tampilkan pesan error jika terjadi kesalahan dalam pembaruan
+        echo "Error updating appointment status: " . $conn->error;
+    }
+}
+
+
+
+// Jika ada permintaan form disubmit
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // Periksa apakah tombol aksi ditekan untuk menerima atau menolak janji temu
+    if (isset($_POST["accept"])) { 
+        $appointment_id = $_POST["appointment_id"];
+        // Panggil fungsi untuk mengubah status janji temu menjadi diterima
+        updateAppointmentStatus($appointment_id, "accepted");
+        // Berikan notifikasi kepada pelanggan tentang status janji temu yang diterima
+        // Anda dapat menggunakan email atau pesan teks untuk memberi tahu pelanggan
+    } elseif (isset($_POST["reject"])) {
+        $appointment_id = $_POST["appointment_id"];
+        // Panggil fungsi untuk mengubah status janji temu menjadi ditolak
+        updateAppointmentStatus($appointment_id, "rejected");
+        // Berikan notifikasi kepada pelanggan tentang status janji temu yang ditolak
+        // Anda dapat menggunakan email atau pesan teks untuk memberi tahu pelanggan
+    }
+}
+// Periksa apakah tombol delete pelanggan ditekan
+if (isset($_POST["delete_customer"])) {
+    // Ambil ID pelanggan yang akan dihapus
+    $customer_id = $_POST["customer_id"];
+
+    // Query untuk mengambil informasi pelanggan sebelum dihapus (opsional)
+    $query_customer_info = "SELECT * FROM user WHERE id_user = '$customer_id'";
+    $result_customer_info = mysqli_query($conn, $query_customer_info);
+    $customer_info = mysqli_fetch_assoc($result_customer_info);
+
+    // JavaScript untuk konfirmasi penghapusan
+    echo "<script>
+            if (confirm('Are you sure you want to delete customer " . $customer_info['username'] . "?')) {
+                // Jika pengguna menekan OK, lanjutkan dengan penghapusan
+                window.location.href = '" . htmlspecialchars($_SERVER["PHP_SELF"]) . "?delete_id=$customer_id';
+            } else {
+                // Jika pengguna menekan Cancel, batalkan penghapusan
+                alert('Deletion canceled');
+            }
+          </script>";
+}
+
+// Jika ada parameter delete_id yang diterima dari JavaScript, hapus pelanggan
+if (isset($_GET['delete_id'])) {
+    // Ambil ID pelanggan yang akan dihapus dari parameter URL
+    $customer_id = $_GET['delete_id'];
+
+    // Query untuk menghapus pelanggan dari database
+    $sql_delete_customer = "DELETE FROM user WHERE id_user = '$customer_id'";
+
+    // Eksekusi query
+    if (mysqli_query($conn, $sql_delete_customer)) {
+        // Pemberitahuan setelah berhasil menghapus
+        echo "<script>alert('Customer deleted successfully!');</script>";
+        // Setelah menghapus, refresh halaman agar perubahan terlihat
+        echo "<script>window.location.href = '" . htmlspecialchars($_SERVER["PHP_SELF"]) . "';</script>";
+    } else {
+        // Pemberitahuan jika terjadi kesalahan saat menghapus
+        echo "<script>alert('Error deleting customer: " . mysqli_error($conn) . "');</script>";
+    }
+}
+
 ?>
 
 <!DOCTYPE html>
@@ -19,6 +115,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true || $_SESSION
     <title>Admin Panel - Hair Studio</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KyZXEAg3QhqLMpG8r+Knujsl5+zE3/xqdjZ0XmxVA5BapK8F5t/0eb5SkELOI4Ip" crossorigin="anonymous">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <style>
           body {
             background-color: #f6e7ea; /* Warna latar belakang */
@@ -47,17 +144,6 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true || $_SESSION
             color: #333; /* Warna judul */
             text-align: center;
         }
-        /* Tambahkan margin ke tombol di kolom "Actions" */
-        .table .btn-primary,
-        .table .btn-success,
-        .table .btn-danger {
-            margin-right: 10px; /* Memberikan jarak di sebelah kanan tombol */
-            display: inline-block; /* Mengatur tombol agar memiliki lebar yang sesuai dengan kontennya */
-            }
-
-        .btn-primary, .btn-success {
-            color: #0011a7; /* Warna teks tombol */   
-        }
 
 
         .btn-danger {
@@ -74,6 +160,53 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true || $_SESSION
         .btn-danger:hover {
             background-color: #c82333; /* Warna latar belakang tombol hapus saat dihover */
             border-color: #c82333; /* Warna border tombol hapus saat dihover */
+        }
+
+        /* Gaya tombol "Accept" */
+        .btn-accept {
+            background-color: green;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        /* Gaya tombol "Reject" */
+        .btn-reject {
+            background-color: red;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        /* Efek hover pada tombol */
+        .btn-accept:hover,
+        .btn-reject:hover {
+            opacity: 0.8; /* Membuat sedikit transparan saat dihover */
+        }
+
+
+        #showAddCustomerForm {
+        background-color: green;
+        color: white;
+        margin-bottom: 10px; /* Memberikan margin bawah */
+        margin-left: 20px;
+        border: none; /* Menghapus border */
+        padding: 8px 16px; /* Padding tombol */
+        cursor: pointer; /* Mengubah kursor saat diarahkan ke tombol */
+        border-radius: 5px; /* Membuat sudut bulat */
+        }
+
+        /* Gaya tombol "Add Customer" saat dihover */
+        #showAddCustomerForm:hover {
+            background-color: darkgreen; /* Mengubah warna latar belakang saat dihover */
+        }
+        #customerForm {
+            margin-left: 20px;
+            margin-bottom: 10px;
         }
 
         /* Tabel */
@@ -217,16 +350,16 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true || $_SESSION
                 <a href="#"><span class="icon"><ion-icon name="home"></ion-icon></span> <span class="title"> Home</span></a>
             </li>
             <li class="list">
-                <a href="#customers"><span class="icon"><ion-icon name="person"></ion-icon></span> <span class="title"> user</span></a>
+                <a href="#customers"><span class="icon"><ion-icon name="person"></ion-icon></span> <span class="title"> User</span></a>
             </li>
             <li class="list">
-                <a href="#appointments"><span class="icon"><ion-icon name="alarm"></ion-icon></ion-icon></span> <span class="title"> analytics</span></a>
+                <a href="#appointments"><span class="icon"><ion-icon name="alarm"></ion-icon></ion-icon></span> <span class="title"> Appointment</span></a>
             </li>
             <li class="list">
-                <a href="#feedback"><span class="icon"><ion-icon name="chatbubbles"></ion-icon></span> <span class="title"> messages</span></a>
+                <a href="#feedback"><span class="icon"><ion-icon name="chatbubbles"></ion-icon></span> <span class="title"> Feedback</span></a>
             </li>
             <li class="list">
-                <a href="logout.php"><span class="icon"><ion-icon name="log-out"></ion-icon></span> <span class="title"> signout</span></a>
+                <a href="logout.php"><span class="icon"><ion-icon name="log-out"></ion-icon></span> <span class="title"> Log Out</span></a>
             </li>
         </ul>
     </div>
@@ -236,106 +369,137 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true || $_SESSION
         <ion-icon name="close" class="close"></ion-icon>
     </div>
     <div class="container mt-5">
-        <h1 class="mb-4">Admin Panel - Gloss&Glam</h1>
+        <h1 class="mb-4"> Halaman Admin - Gloss&Glam</h1>
 <!-- Bagian Home -->
 <div id="home">
 <h2 style="text-decoration: underline;  text-decoration-color: #ff1493;">Home</h2>
-    <p>Welcome to the Admin Panel of Hair Studio! This panel provides you with all the tools and features you need to manage your salon business efficiently. Here, you can perform various tasks such as managing customers, handling appointments, and reviewing feedback from clients.</p>
-    
-    <h3>Features:</h3>
-    <ul>
-        <li><strong>Customers:</strong> View, edit, and delete customer information. Keep track of your loyal customers and their contact details.</li>
-        <li><strong>Appointments:</strong> Manage appointments by approving or canceling them. Stay organized with a clear overview of upcoming appointments.</li>
-        <li><strong>Feedbacks:</strong> Monitor client feedback and ratings for different treatments. Use this information to improve your salon services.</li>
-    </ul>
-    
+    <p>Selamat datang di Halaman Admin! Halaman ini menyediakan fitur yang Anda butuhkan untuk mengelola bisnis hair studio Anda dengan efisien. Di sini, Anda dapat melakukan berbagai task seperti mengelola pelanggan, melakukan penyetujuan dan pembatalan appointment, dan meninjau feedback dari customer.</p>
+
     <h3>Tips for Effective Salon Management:</h3>
     <ol>
-        <li><strong>Stay Organized:</strong> Use the appointment scheduler to manage your time effectively. Ensure that your staff is aware of their schedules and duties.</li>
-        <li><strong>Provide Excellent Customer Service:</strong> Focus on delivering exceptional service to every customer. Address their needs and concerns promptly.</li>
-        <li><strong>Keep Your Salon Clean and Hygienic:</strong> Maintain a clean and hygienic environment to ensure the comfort and safety of your clients.</li>
-        <li><strong>Promote Your Services:</strong> Utilize social media platforms and other marketing channels to promote your salon services and attract new clients.</li>
-        <li><strong>Seek Feedback:</strong> Encourage clients to provide feedback on their salon experience. Use their input to identify areas for improvement and enhance customer satisfaction.</li>
+    <li><strong>Stay Organized:</strong> Gunakan penjadwalan appointment untuk mengelola waktu Anda dengan efektif. Pastikan bahwa staf dan stylist mengetahui jadwal dan tugas mereka.</li>
+        <li><strong>Provide Excellent Customer Service:</strong> Fokuslah pada memberikan layanan yang luar biasa kepada setiap customer. Tanggapi kebutuhan dan kekhawatiran mereka dengan cepat.</li>
+        <li><strong>Keep Your Hair Studio Clean and Hygienic:</strong>Pertahankan lingkungan yang bersih dan higienis untuk menjamin kenyamanan dan keamanan customer Anda.</li>
+        <li><strong>Promote Your Services:</strong> Manfaatkan platform media sosial dan saluran pemasaran lainnya untuk mempromosikan layanan hair studio dan menarik customer baru.</li>
+        <li><strong>Seek Feedback:</strong> Dorong customer untuk memberikan feedback tentang pengalaman mereka di hair studio. Gunakan masukan mereka untuk mengidentifikasi bagian yang perlu diperbaiki dan meningkatkan kepuasan pelanggan.</li>
     </ol>
 </div>
 
-        <h2 style="text-decoration: underline;  text-decoration-color: #ff1493;">Customers</h2>
-        <div class="table-responsive" id="customers">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    // Query untuk mengambil data pelanggan dari database
-                    $query_customers = "SELECT * FROM user WHERE level = 'customer'";
-                    $result_customers = mysqli_query($conn, $query_customers);
 
-                    if (mysqli_num_rows($result_customers) > 0) {
-                        while ($row_customer = mysqli_fetch_assoc($result_customers)) {
-                            echo "<tr>";
-                            echo "<td>" . $row_customer['id_user'] . "</td>";
-                            echo "<td>" . $row_customer['username'] . "</td>";
-                            echo "<td>" . $row_customer['email'] . "</td>";
-                            echo "<td>
-                                    <a href='update.php' class='btn btn-primary btn-sm'>Edit</a>
-                                    <a href='#' class='btn btn-danger btn-sm'>Delete</a>
-                                </td>";
-                            echo "</tr>";
-                        }
-                    } else {
-                        echo "<tr><td colspan='4'>No customers found</td></tr>";
-                    }
-                    ?>
-                </tbody>
-            </table>
-        </div>
+<h2 style="text-decoration: underline;  text-decoration-color: #ff1493;">Customers</h2>
+<div id="customers">
+<button id="showAddCustomerForm" class="btn btn-success">Add Customer</button>
 
-        <h2 style="text-decoration: underline;  text-decoration-color: #ff1493;">Appointments</h2>
-        <div class="table-responsive" id="appointments">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th>Service</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    // Fetch appointments data from database
-                    $query_appointments = "SELECT * FROM appointments";
-                    $result_appointments = mysqli_query($conn, $query_appointments);
+    <!-- Form Add Customer (sembunyikan awalnya menggunakan inline CSS) -->
+    <!-- Form Add Customer -->
+    <div id="addCustomerForm" style="display: none;">
+        <form id="customerForm" action="" method="post">
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" name="username" required>
+            </div>
+            <div class="mb-3">
+                <label for="email" class="form-label">Email address</label>
+                <input type="email" class="form-control" id="email" name="email" required>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+            </div>
+            <button type="submit" name="submit" class="btn btn-success" style="background-color: green; color: white;">Add Customer</button>
+        </form>
+    </div>
 
-                    if (mysqli_num_rows($result_appointments) > 0) {
-                        while ($row = mysqli_fetch_assoc($result_appointments)) {
-                            echo "<tr>";
-                            echo "<td>" . $row['id'] . "</td>";
-                            echo "<td>" . $row['name'] . "</td>";
-                            echo "<td>" . $row['date'] . "</td>";
-                            echo "<td>" . $row['time'] . "</td>";
-                            echo "<td>" . $row['service'] . "</td>";
-                            echo "<td>";
-                            echo "<a href='approve_appointment.php?id=" . $row['id'] . "' class='btn btn-success btn-sm'>Approve</a>"; // Tautan untuk menyetujui janji
-                            echo "<a href='cancel_appointment.php?id=" . $row['id'] . "' class='btn btn-danger btn-sm'>Cancel</a>"; // Tautan untuk membatalkan janji
-                            echo "</td>";
-                            echo "</tr>";
-                        }
-                    } else {
-                        echo "<tr><td colspan='6'>No appointments found</td></tr>";
-                    }
-                    ?>
-                </tbody>
-            </table>
-        </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php
+            // Query untuk mengambil data pelanggan dari database
+            $query_customers = "SELECT * FROM user WHERE level = 'customer'";
+            $result_customers = mysqli_query($conn, $query_customers);
+
+            if (mysqli_num_rows($result_customers) > 0) {
+                while ($row_customer = mysqli_fetch_assoc($result_customers)) {
+                    echo "<tr>";
+                    echo "<td>" . $row_customer['id_user'] . "</td>";
+                    echo "<td>" . $row_customer['username'] . "</td>";
+                    echo "<td>" . $row_customer['email'] . "</td>";
+                    echo "<td>
+                        <form method='post' action='" . htmlspecialchars($_SERVER["PHP_SELF"]) . "'>
+                            <input type='hidden' name='customer_id' value='" . $row_customer['id_user'] . "'>
+                            <button type='submit' name='delete_customer' class='btn btn-danger'>Delete</button>
+                        </form>
+                    </td>";
+                    echo "</tr>";
+                }
+            } else {
+                echo "<tr><td colspan='4'>No customers found</td></tr>";
+            }
+            ?>
+        </tbody>
+    </table>
+</div>
+
+
+<h2 style="text-decoration: underline; text-decoration-color: #ff1493;">Appointments</h2>
+<div class="table-responsive" id="appointments">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Service</th>
+                <th>Status</th>
+                <th>Action</th> <!-- Menambahkan kolom aksi -->
+            </tr>
+        </thead>
+
+        <tbody>
+            <?php
+            // Fetch appointments data from database
+            $query_appointments = "SELECT * FROM appointments";
+            $result_appointments = mysqli_query($conn, $query_appointments);
+
+            if (mysqli_num_rows($result_appointments) > 0) {
+                while ($row = mysqli_fetch_assoc($result_appointments)) {
+                    echo "<tr>";
+                    echo "<td>" . $row['id'] . "</td>";
+                    echo "<td>" . $row['name'] . "</td>";
+                    echo "<td>" . $row['date'] . "</td>";
+                    echo "<td>" . $row['time'] . "</td>";
+                    echo "<td>" . $row['service'] . "</td>";
+                    echo "<td>" . $row['status'] . "</td>";
+
+                    // Kolom aksi untuk menerima atau menolak janji temu
+                    echo "<td>";
+                    echo "<form method='post' action='" . htmlspecialchars($_SERVER["PHP_SELF"]) . "'>";
+                    echo "<input type='hidden' name='appointment_id' value='" . $row['id'] . "'>";
+                    echo "<input type='submit' name='accept' value='Accept' class='btn-accept'>";
+                    echo "<input type='submit' name='reject' value='Reject' class='btn-reject'>";
+                    echo "</form>";
+                    echo "</td>";
+                    echo "</tr>";
+                }
+            } else {
+                echo "<tr><td colspan='7'>No appointments found</td></tr>";
+            }
+            ?>
+        </tbody>
+    </table>
+</div>
+
 
         <h2 style="text-decoration: underline;  text-decoration-color: #ff1493;">Feedbacks</h2>
         <div class="table-responsive" id="feedback">
@@ -394,23 +558,27 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true || $_SESSION
                         list[i].className = 'list active';
                     }
                 }
-                
-                function openEditForm(customer_id, username, email) {
-                    // Semua form edit disembunyikan terlebih dahulu
-                    let editForms = document.querySelectorAll('[id^=editForm]');
-                    editForms.forEach(form => {
-                        form.style.display = 'none';
-                    });
+ // Fungsi untuk menampilkan formulir tambah pelanggan
+ function showAddCustomerForm() {
+        var form = document.getElementById("addCustomerForm");
+        form.style.display = "block"; // Tampilkan formulir
+    }
 
-                    // Form edit yang sesuai dengan customer_id akan ditampilkan
-                    let editForm = document.getElementById('editForm-' + customer_id);
-                    editForm.style.display = 'block';
+    // Ketika tombol "Add Customer" diklik, tampilkan formulir
+    document.getElementById("showAddCustomerForm").addEventListener("click", function() {
+        showAddCustomerForm();
+    });
 
-                    // Isi nilai form dengan data pelanggan yang sesuai
-                    editForm.querySelector('input[name="new_username"]').value = username;
-                    editForm.querySelector('input[name="new_email"]').value = email;
-                }
-                </script>
+    // Fungsi untuk menyembunyikan formulir tambah pelanggan
+    function hideAddCustomerForm() {
+        var form = document.getElementById("addCustomerForm");
+        form.style.display = "none"; // Sembunyikan formulir
+    }
 
+    // Ketika formulir tambah pelanggan dikirim, sembunyikan formulir
+    document.getElementById("customerForm").addEventListener("submit", function() {
+        hideAddCustomerForm();
+    });
+    </script>
 </body>
 </html>
